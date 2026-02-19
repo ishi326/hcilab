@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://unpkg.com/webgazer@2.0.0/dist/webgazer.min.js"></script>
+
+</head>
+<body>
+<h1>WebGazer Test</h1>
+
+<script>
+window.onload = function() {
+  webgazer.setGazeListener(function(data) {
+    if (data) {
+      console.log(data.x, data.y);
+    }
+  }).begin();
+
+  webgazer.showVideoPreview(true);
+  webgazer.showPredictionPoints(true);
+};
+</script>
+
+</body>
+</html>

@@ -1,56 +1,121 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Basic WebGazer Demo</title>
+  <title>WebGazer Attention Switch Demo</title>
   <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+
   <style>
     body {
       margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
       overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    #dot {
-      width: 20px;
-      height: 20px;
-      background-color: red;
-      border-radius: 50%;
-      position: absolute;
-      pointer-events: none;
-    }
-
-    #instructions {
+    #timer {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      background: white;
-      padding: 10px;
-      font-family: Arial;
+      top: 20px;
+      right: 20px;
+      font-size: 24px;
+      background: lightgray;
+      padding: 10px 15px;
+      border-radius: 8px;
+    }
+
+    #centerText {
+      font-size: 32px;
+      text-align: center;
+      width: 50%;
+    }
+
+    #results {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: 20px;
     }
   </style>
 </head>
 
 <body>
 
-<div id="instructions">
-  Click around the screen to help WebGazer calibrate 👀
+<div id="timer">60</div>
+
+<div id="centerText">
+  Focus on this text in the middle of the screen.
 </div>
 
-<div id="dot"></div>
+<div id="results">
+  Switch Count: 0
+</div>
 
 <script>
-  const dot = document.getElementById("dot");
+  const timerElement = document.getElementById("timer");
+  const centerText = document.getElementById("centerText");
+  const results = document.getElementById("results");
+
+  let timeLeft = 60;
+  let switchCount = 0;
+  let lastRegion = null;
+  let trackingActive = true;
+
+  // TIMER COUNTDOWN
+  const countdown = setInterval(() => {
+    timeLeft--;
+    timerElement.innerText = timeLeft;
+
+    if (timeLeft <= 0) {
+      clearInterval(countdown);
+      trackingActive = false;
+      webgazer.end();
+      alert("Time's up!\nTotal switches: " + switchCount);
+    }
+  }, 1000);
+
+  function getRegion(x, y) {
+    const timerRect = timerElement.getBoundingClientRect();
+    const textRect = centerText.getBoundingClientRect();
+
+    if (
+      x >= timerRect.left &&
+      x <= timerRect.right &&
+      y >= timerRect.top &&
+      y <= timerRect.bottom
+    ) {
+      return "timer";
+    }
+
+    if (
+      x >= textRect.left &&
+      x <= textRect.right &&
+      y >= textRect.top &&
+      y <= textRect.bottom
+    ) {
+      return "text";
+    }
+
+    return "other";
+  }
 
   webgazer.setGazeListener(function(data, elapsedTime) {
-    if (data == null) return;
+    if (!trackingActive || data == null) return;
 
-    const x = data.x;
-    const y = data.y;
+    const region = getRegion(data.x, data.y);
 
-    dot.style.left = x + "px";
-    dot.style.top = y + "px";
+    if (region !== "other" && lastRegion !== null && region !== lastRegion) {
+      switchCount++;
+      results.innerText = "Switch Count: " + switchCount;
+    }
+
+    if (region !== "other") {
+      lastRegion = region;
+    }
+
   }).begin();
 
-  // Optional: Hide WebGazer’s video preview
   webgazer.showVideo(false);
   webgazer.showPredictionPoints(false);
 </script>

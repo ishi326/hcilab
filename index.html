@@ -1,34 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>WebGazer Attention Switch Demo</title>
+
+  <!-- WebGazer CDN -->
   <script src="https://cdn.jsdelivr.net/npm/webgazer/dist/webgazer.min.js"></script>
-
-<script>
-  // IMPORTANT: Tell WebGazer where MediaPipe assets are
-  webgazer.setRegression('ridge')  // avoids some faceMesh bugs
-
-  webgazer.params.faceMeshBasePath =
-    "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/";
-
-  webgazer.setGazeListener(function(data, elapsedTime) {
-    if (!trackingActive || data == null) return;
-
-    const region = getRegion(data.x, data.y);
-
-    if (region !== "other" && lastRegion !== null && region !== lastRegion) {
-      switchCount++;
-      results.innerText = "Switch Count: " + switchCount;
-    }
-
-    if (region !== "other") {
-      lastRegion = region;
-    }
-  }).begin();
-
-  webgazer.showVideo(false);
-  webgazer.showPredictionPoints(false);
-</script>
 
   <style>
     body {
@@ -45,10 +22,10 @@
       position: fixed;
       top: 20px;
       right: 20px;
-      font-size: 24px;
+      font-size: 40px;
       background: lightgray;
-      padding: 10px 15px;
-      border-radius: 8px;
+      padding: 20px 30px;
+      border-radius: 12px;
     }
 
     #centerText {
@@ -61,7 +38,16 @@
       position: fixed;
       bottom: 20px;
       left: 20px;
-      font-size: 20px;
+      font-size: 22px;
+    }
+
+    .calibration-dot {
+      width: 25px;
+      height: 25px;
+      background: red;
+      border-radius: 50%;
+      position: fixed;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -79,27 +65,38 @@
 </div>
 
 <script>
+  // Fix MediaPipe path for Vercel
+  webgazer.params.faceMeshBasePath =
+    "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/";
+
+  webgazer.setRegression('ridge');
+
   const timerElement = document.getElementById("timer");
   const centerText = document.getElementById("centerText");
   const results = document.getElementById("results");
 
   let timeLeft = 60;
   let switchCount = 0;
-  let lastRegion = null;
-  let trackingActive = true;
+  let trackingActive = false;
 
-  // TIMER COUNTDOWN
-  const countdown = setInterval(() => {
-    timeLeft--;
-    timerElement.innerText = timeLeft;
+  let currentRegion = null;
+  let stableRegion = null;
+  let regionStartTime = 0;
+  const STABILITY_TIME = 300;
 
-    if (timeLeft <= 0) {
-      clearInterval(countdown);
-      trackingActive = false;
-      webgazer.end();
-      alert("Time's up!\nTotal switches: " + switchCount);
-    }
-  }, 1000);
+  function startTimer() {
+    const countdown = setInterval(() => {
+      timeLeft--;
+      timerElement.innerText = timeLeft;
+
+      if (timeLeft <= 0) {
+        clearInterval(countdown);
+        trackingActive = false;
+        webgazer.end();
+        alert("Time's up!\nTotal switches: " + switchCount);
+      }
+    }, 1000);
+  }
 
   function getRegion(x, y) {
     const timerRect = timerElement.getBoundingClientRect();
@@ -110,42 +107,106 @@
       x <= timerRect.right &&
       y >= timerRect.top &&
       y <= timerRect.bottom
-    ) {
-      return "timer";
-    }
+    ) return "timer";
 
     if (
       x >= textRect.left &&
       x <= textRect.right &&
       y >= textRect.top &&
       y <= textRect.bottom
-    ) {
-      return "text";
-    }
+    ) return "text";
 
     return "other";
   }
 
-  webgazer.setGazeListener(function(data, elapsedTime) {
-    if (!trackingActive || data == null) return;
+  function startTracking() {
+    webgazer.setGazeListener(function(data) {
+      if (!trackingActive || data == null) return;
 
-    const region = getRegion(data.x, data.y);
+      const region = getRegion(data.x, data.y);
+      if (region === "other") return;
 
-    if (region !== "other" && lastRegion !== null && region !== lastRegion) {
-      switchCount++;
-      results.innerText = "Switch Count: " + switchCount;
+      const now = Date.now();
+
+      if (region !== currentRegion) {
+        currentRegion = region;
+        regionStartTime = now;
+      }
+
+      if (region === currentRegion && now - regionStartTime > STABILITY_TIME) {
+        if (stableRegion !== region) {
+          if (stableRegion !== null) {
+            switchCount++;
+            results.innerText = "Switch Count: " + switchCount;
+          }
+          stableRegion = region;
+        }
+      }
+
+    }).begin();
+
+    webgazer.showVideo(false);
+    webgazer.showPredictionPoints(false);
+
+    trackingActive = true;
+    startTimer();
+  }
+
+  const calibrationPoints = [
+    { x: "10%", y: "10%" },
+    { x: "50%", y: "10%" },
+    { x: "90%", y: "10%" },
+    { x: "10%", y: "50%" },
+    { x: "50%", y: "50%" },
+    { x: "90%", y: "50%" },
+    { x: "10%", y: "90%" },
+    { x: "50%", y: "90%" },
+    { x: "90%", y: "90%" }
+  ];
+
+  let calibrationClicks = {};
+  let calibrationComplete = false;
+
+  function createCalibration() {
+    alert("Calibration starting.\nLook at each red dot and click it 5 times.");
+
+    calibrationPoints.forEach((point, index) => {
+      const dot = document.createElement("div");
+      dot.className = "calibration-dot";
+      dot.style.left = point.x;
+      dot.style.top = point.y;
+      dot.style.transform = "translate(-50%, -50%)";
+
+      calibrationClicks[index] = 0;
+
+      dot.addEventListener("click", function () {
+        calibrationClicks[index]++;
+        dot.style.opacity = 1 - calibrationClicks[index] * 0.15;
+
+        if (calibrationClicks[index] >= 5) {
+          dot.remove();
+        }
+
+        checkCalibrationComplete();
+      });
+
+      document.body.appendChild(dot);
+    });
+  }
+
+  function checkCalibrationComplete() {
+    const allDone = Object.values(calibrationClicks).every(c => c >= 5);
+    if (allDone && !calibrationComplete) {
+      calibrationComplete = true;
+      alert("Calibration complete! Tracking begins.");
+      startTracking();
     }
+  }
 
-    if (region !== "other") {
-      lastRegion = region;
-    }
-
-  }).begin();
-
-  webgazer.showVideo(false);
-  webgazer.showPredictionPoints(false);
+  window.onload = function () {
+    createCalibration();
+  };
 </script>
 
 </body>
 </html>
-

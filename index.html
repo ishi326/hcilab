@@ -121,6 +121,10 @@
 
   function startTracking() {
 
+    webgazer.clearData();
+    webgazer.removeMouseEventListeners();
+
+
     webgazer.setGazeListener(function(data) {
       if (!trackingActive || data == null) return;
 

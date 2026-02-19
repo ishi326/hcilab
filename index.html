@@ -2,7 +2,33 @@
 <html>
 <head>
   <title>WebGazer Attention Switch Demo</title>
-  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/webgazer/dist/webgazer.min.js"></script>
+
+<script>
+  // IMPORTANT: Tell WebGazer where MediaPipe assets are
+  webgazer.setRegression('ridge')  // avoids some faceMesh bugs
+
+  webgazer.params.faceMeshBasePath =
+    "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/";
+
+  webgazer.setGazeListener(function(data, elapsedTime) {
+    if (!trackingActive || data == null) return;
+
+    const region = getRegion(data.x, data.y);
+
+    if (region !== "other" && lastRegion !== null && region !== lastRegion) {
+      switchCount++;
+      results.innerText = "Switch Count: " + switchCount;
+    }
+
+    if (region !== "other") {
+      lastRegion = region;
+    }
+  }).begin();
+
+  webgazer.showVideo(false);
+  webgazer.showPredictionPoints(false);
+</script>
 
   <style>
     body {

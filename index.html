@@ -179,6 +179,11 @@ webgazer.setGazeListener((data) => {
 
 }).begin();
 
+  webgazer.setGazeListener(function(data) {
+  if (data) {
+    console.log("X:", data.x, "Y:", data.y);
+  }
+}).begin();
 /* ===============================
    END EXPERIMENT
 ================================= */

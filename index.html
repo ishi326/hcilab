@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebGazer Toggle Experiment</title>
+
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #timer {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 28px;
+      border: 3px solid black;
+      padding: 12px 18px;
+      font-weight: bold;
+    }
+
+    #textBox {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 500px;
+      font-size: 22px;
+      border: 3px solid black;
+      padding: 25px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    #stats {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="timer">2:00</div>
+
+<div id="textBox">
+  This is the main text in the center of the screen.  
+  Please switch your gaze naturally between this text and the timer in the corner.
+</div>
+
+<div id="stats">
+  Toggles: 0 <br>
+  Timer Fixation: 0 ms <br>
+  Text Fixation: 0 ms
+</div>
+
+<script>
+/* ===============================
+   VARIABLES
+================================= */
+
+let toggleCount = 0;
+
+let currentRegion = null;
+let stableRegion = null;
+let lastRegion = null;
+
+let lastTimestamp = Date.now();
+let regionStartTime = Date.now();
+
+let timerFixation = 0;
+let textFixation = 0;
+
+let totalTime = 120; // 2 minutes
+let countdownInterval;
+
+const DWELL_THRESHOLD = 150; // ms to prevent jitter toggles
+
+/* ===============================
+   TIMER FUNCTIONS
+================================= */
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+}
+
+function startCountdown() {
+  document.getElementById("timer").innerText = formatTime(totalTime);
+
+  countdownInterval = setInterval(() => {
+    totalTime--;
+    document.getElementById("timer").innerText = formatTime(totalTime);
+
+    if (totalTime <= 0) {
+      clearInterval(countdownInterval);
+      endExperiment();
+    }
+  }, 1000);
+}
+
+/* ===============================
+   REGION DETECTION
+================================= */
+
+function getRegion(x, y) {
+  const timerRect = document.getElementById("timer").getBoundingClientRect();
+  const textRect = document.getElementById("textBox").getBoundingClientRect();
+
+  if (
+    x >= timerRect.left &&
+    x <= timerRect.right &&
+    y >= timerRect.top &&
+    y <= timerRect.bottom
+  ) {
+    return "timer";
+  }
+
+  if (
+    x >= textRect.left &&
+    x <= textRect.right &&
+    y >= textRect.top &&
+    y <= textRect.bottom
+  ) {
+    return "text";
+  }
+
+  return "other";
+}
+
+/* ===============================
+   WEBGAZER LOGIC
+================================= */
+
+webgazer.setGazeListener((data) => {
+  if (!data || totalTime <= 0) return;
+
+  const x = data.x;
+  const y = data.y;
+
+  currentRegion = getRegion(x, y);
+
+  const now = Date.now();
+  const delta = now - lastTimestamp;
+
+  // accumulate fixation time
+  if (stableRegion === "timer") {
+    timerFixation += delta;
+  } else if (stableRegion === "text") {
+    textFixation += delta;
+  }
+
+  // dwell-based stabilization (prevents jitter toggles)
+  if (currentRegion !== stableRegion) {
+    if (now - regionStartTime > DWELL_THRESHOLD) {
+      if (
+        stableRegion &&
+        currentRegion !== stableRegion &&
+        (currentRegion === "timer" || currentRegion === "text")
+      ) {
+        toggleCount++;
+      }
+
+      stableRegion = currentRegion;
+      regionStartTime = now;
+    }
+  }
+
+  lastTimestamp = now;
+
+  updateStats();
+
+}).begin();
+
+/* ===============================
+   END EXPERIMENT
+================================= */
+
+function endExperiment() {
+  webgazer.end();
+
+  updateStats();
+
+  alert("Time's up!\n\nFinal Results:\n" +
+        "Toggles: " + toggleCount +
+        "\nTimer Fixation: " + timerFixation + " ms" +
+        "\nText Fixation: " + textFixation + " ms");
+}
+
+/* ===============================
+   UPDATE UI
+================================= */
+
+function updateStats() {
+  document.getElementById("stats").innerHTML =
+    "Toggles: " + toggleCount + "<br>" +
+    "Timer Fixation: " + timerFixation + " ms<br>" +
+    "Text Fixation: " + textFixation + " ms";
+}
+
+/* ===============================
+   INITIALIZATION
+================================= */
+
+webgazer.showPredictionPoints(false);
+webgazer.showVideoPreview(true);
+webgazer.showFaceOverlay(true);
+webgazer.showFaceFeedbackBox(true);
+
+startCountdown();
+
+</script>
+
+</body>
+</html>
+

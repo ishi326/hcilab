@@ -120,6 +120,9 @@
   }
 
   function startTracking() {
+
+    webgazer.clearData();
+    
     webgazer.setGazeListener(function(data) {
       if (!trackingActive || data == null) return;
 
